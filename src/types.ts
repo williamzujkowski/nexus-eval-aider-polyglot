@@ -68,9 +68,17 @@ export interface AiderPrediction {
 /**
  * Verdict for one Aider polyglot instance.
  *
- * v0.1 captures whether the model produced any parsable edits;
- * v0.3 follow-up will run the language-specific test suite against
- * the emitted edits and turn that into the canonical pass/fail.
+ * v0.1 captures whether the model produced any parsable edits.
+ *
+ * v0.2 adds optional test-execution fields populated by the
+ * per-language test runner when the instance carries `hiddenTests`.
+ * `testsPassed` is the canonical pass/fail when present:
+ *
+ *   - `testsPassed === true`  → model's edits compile + tests pass
+ *   - `testsPassed === false` → tests ran but failed (see testStderr)
+ *   - `testsPassed === undefined` → no tests bundled (synthetic
+ *     fixture) OR test execution was skipped via `runTests: false`
+ *     adapter config
  */
 export interface AiderEvalResult {
   readonly instanceId: string;
@@ -78,6 +86,14 @@ export interface AiderEvalResult {
   readonly editsProduced: boolean;
   readonly editedFileCount: number;
   readonly error?: string;
+  /** v0.2: pass/fail of the per-language test runner (undefined when not run). */
+  readonly testsPassed?: boolean;
+  /** v0.2: name of the toolchain that ran (`pytest`, `go test`, …). */
+  readonly testRunner?: string;
+  /** v0.2: truncated stderr from the test runner — for diagnosis. */
+  readonly testStderr?: string;
+  /** v0.2: true iff the language toolchain wasn't installed. */
+  readonly toolchainMissing?: boolean;
 }
 
 export interface AiderAdapterConfig {
@@ -85,13 +101,26 @@ export interface AiderAdapterConfig {
    * Where to load exercises from.
    *
    * - `'fixture'` (default): bundled six-language smoke set
-   * - `'github'`: fetch from `Aider-AI/aider` on GitHub (v0.2 — not yet implemented)
+   * - `'github'`: fetch from `Aider-AI/aider` on GitHub
+   * - `'github:<ref>'`: pin a branch / tag / commit SHA
    * - any other string: treat as an absolute path to a local Aider
    *   `benchmark/exercises/` directory
    */
   readonly source?: 'fixture' | 'github' | string;
   /** Filter the exercise set to specific languages. */
   readonly languages?: ReadonlyArray<PolyglotLanguage>;
-  /** Reserved for v0.2 GitHub-fetch caching. */
+  /** v0.2 GitHub-fetch caching root. */
   readonly cacheDir?: string;
+  /**
+   * v0.2: actually run the per-language toolchain against the model's
+   * edits to get test-based pass/fail. Default: `true`. Set to `false`
+   * for fast smoke runs where pass/fail = "did the model produce
+   * extractable edits" is enough.
+   *
+   * When `true` and the instance has no `hiddenTests`, falls back to
+   * the v0.1 verdict (`editsProduced`).
+   */
+  readonly runTests?: boolean;
+  /** v0.2: per-instance test timeout. Default: 60_000ms. */
+  readonly testTimeoutMs?: number;
 }

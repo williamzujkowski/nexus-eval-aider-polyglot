@@ -28,6 +28,7 @@ import type {
 
 import { loadAiderInstances } from './runner/instance-loader.js';
 import { generatePrediction } from './runner/agent-invoker.js';
+import { runTests, type RunTestsOptions } from './runner/test-runner.js';
 import type {
   AiderAdapterConfig,
   AiderEvalResult,
@@ -44,7 +45,12 @@ export class AiderPolyglotAdapter
 
   private readonly modelAdapter: IModelAdapter;
   private readonly config: AiderAdapterConfig;
-  private readonly resultCache = new Map<string, AiderEvalResult>();
+  /**
+   * Model-only verdict captured during runInstance (so the test runner
+   * gets executed in evaluate() but we still know what the model
+   * produced if we choose to skip tests).
+   */
+  private readonly modelOnlyVerdictCache = new Map<string, AiderEvalResult>();
 
   constructor(modelAdapter: IModelAdapter, config: AiderAdapterConfig = {}) {
     this.modelAdapter = modelAdapter;
@@ -72,7 +78,7 @@ export class AiderPolyglotAdapter
         modelLabel: this.modelAdapter.modelId,
         durationMs: 0,
       };
-      this.resultCache.set(instance.instanceId, {
+      this.modelOnlyVerdictCache.set(instance.instanceId, {
         instanceId: instance.instanceId,
         language: instance.language,
         editsProduced: false,
@@ -83,7 +89,7 @@ export class AiderPolyglotAdapter
     }
 
     const editedCount = Object.keys(result.value.editedFiles).length;
-    this.resultCache.set(instance.instanceId, {
+    this.modelOnlyVerdictCache.set(instance.instanceId, {
       instanceId: instance.instanceId,
       language: instance.language,
       editsProduced: editedCount > 0,
@@ -93,22 +99,65 @@ export class AiderPolyglotAdapter
     return result.value;
   }
 
-  evaluate(
+  /**
+   * v0.2: when the instance ships `hiddenTests` AND `runTests` is on
+   * (default), materialises the workspace and runs the language
+   * toolchain. Otherwise returns the v0.1 model-only verdict.
+   */
+  async evaluate(
     instance: AiderInstance,
     prediction: AiderPrediction
   ): Promise<AiderEvalResult> {
-    const cached = this.resultCache.get(instance.instanceId);
-    if (cached !== undefined) return Promise.resolve(cached);
-    const editedCount = Object.keys(prediction.editedFiles).length;
-    return Promise.resolve({
+    const baseVerdict = this.modelOnlyVerdictCache.get(instance.instanceId) ?? {
       instanceId: instance.instanceId,
       language: instance.language,
-      editsProduced: editedCount > 0,
-      editedFileCount: editedCount,
-    });
+      editsProduced: Object.keys(prediction.editedFiles).length > 0,
+      editedFileCount: Object.keys(prediction.editedFiles).length,
+    };
+
+    const runTestsEnabled = this.config.runTests ?? true;
+    const hasHiddenTests =
+      instance.hiddenTests !== undefined && Object.keys(instance.hiddenTests).length > 0;
+    const editsExist = Object.keys(prediction.editedFiles).length > 0;
+    if (!runTestsEnabled || !hasHiddenTests || !editsExist) {
+      return baseVerdict;
+    }
+
+    const testRunOptions: RunTestsOptions = {};
+    if (this.config.testTimeoutMs !== undefined) {
+      Object.assign(testRunOptions, { timeoutMs: this.config.testTimeoutMs });
+    }
+    if (this.testRunnerSpawnImpl !== undefined) {
+      Object.assign(testRunOptions, { spawnImpl: this.testRunnerSpawnImpl });
+    }
+    const testResult = await runTests(instance, prediction, testRunOptions);
+
+    return {
+      ...baseVerdict,
+      testsPassed: testResult.passed,
+      testRunner: testResult.testRunner,
+      ...(testResult.stderr.length > 0 && { testStderr: testResult.stderr }),
+      ...(testResult.toolchainMissing && { toolchainMissing: true }),
+      ...(testResult.toolchainMissing && {
+        error: `${testResult.testRunner} not found in PATH (toolchain missing)`,
+      }),
+    };
+  }
+
+  /**
+   * Test-runner spawn injection point (constructor-set after-the-fact
+   * via a setter pattern is overkill for v0.2; tests inject by passing
+   * a spawn through the test-runner directly).
+   */
+  private testRunnerSpawnImpl: RunTestsOptions['spawnImpl'];
+
+  /** Set spawn for tests. Production callers don't use this. */
+  setSpawnImplForTests(impl: RunTestsOptions['spawnImpl']): void {
+    this.testRunnerSpawnImpl = impl;
   }
 
   isPass(result: AiderEvalResult): boolean {
+    if (result.testsPassed !== undefined) return result.testsPassed;
     return result.editsProduced && result.error === undefined;
   }
 

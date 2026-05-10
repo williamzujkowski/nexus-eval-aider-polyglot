@@ -21,3 +21,5 @@ export { generatePrediction } from './runner/agent-invoker.js';
 export type { GeneratePredictionOptions } from './runner/agent-invoker.js';
 export { extractEditedFiles } from './runner/file-extractor.js';
 export { composeUserPrompt, getSystemPrompt } from './runner/prompt-template.js';
+export { runTests } from './runner/test-runner.js';
+export type { RunTestsOptions, TestRunResult, SpawnImpl } from './runner/test-runner.js';

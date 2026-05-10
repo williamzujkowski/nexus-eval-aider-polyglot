@@ -100,6 +100,8 @@ async function main(argv: readonly string[]): Promise<number> {
       'model-id': { type: 'string' },
       source: { type: 'string' },
       languages: { type: 'string' },
+      'no-run-tests': { type: 'boolean', default: false },
+      'test-timeout': { type: 'string' },
       limit: { type: 'string' },
       concurrency: { type: 'string', default: '1' },
       timeout: { type: 'string', default: '300000' },
@@ -136,6 +138,10 @@ async function main(argv: readonly string[]): Promise<number> {
   const adapter = new AiderPolyglotAdapter(modelAdapter, {
     ...(parsed.values.source !== undefined && { source: parsed.values.source }),
     ...(languages !== undefined && { languages }),
+    ...(parsed.values['no-run-tests'] === true && { runTests: false }),
+    ...(parsed.values['test-timeout'] !== undefined && {
+      testTimeoutMs: Number(parsed.values['test-timeout']),
+    }),
   });
 
   const summary = await runBenchmark(adapter, {}, {
