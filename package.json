@@ -1,0 +1,42 @@
+{
+  "name": "nexus-eval-BENCHMARK",
+  "version": "0.0.1",
+  "description": "TEMPLATE — Replace with: '<benchmark-name> evaluation harness for nexus-agents'",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "nexus-eval-BENCHMARK": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nexus-agents",
+    "nexus-agents-eval",
+    "benchmark",
+    "evaluation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist/"
+  ],
+  "peerDependencies": {
+    "nexus-agents": ">=2.33.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "nexus-agents": "^2.33.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
