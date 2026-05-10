@@ -2,7 +2,7 @@
 
 Aider polyglot evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
-> **Status**: v0.2 — real test-based pass/fail. GitHub-fetch loader pulls from `Aider-AI/aider` with on-disk cache; per-language sandboxed test runner (pytest / npm test / go test / cargo test / make test) drives the verdict. Set `runTests: false` (or pass `--no-run-tests`) to fall back to the v0.1 "did the model produce edits" pass/fail. v0.3 will add multi-turn agentic flow via `ICliAdapter`.
+> **Status**: v0.3 — multi-turn agentic flow. Opt in with `agenticMode: true` (or `--agentic-mode`); the model gets `read_file` / `write_file` / `run_tests` tools and iterates until tests pass or the turn budget hits. Built on the `IAgenticAdapter` primitive from nexus-agents 2.72.1. v0.2 single-shot mode remains the default — agentic mode is opt-in because it's slower + more expensive per instance.
 
 ## Why Aider polyglot
 
