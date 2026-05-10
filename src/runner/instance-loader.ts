@@ -163,7 +163,8 @@ function readExercise(
   const problemStatement = readFileSync(instructionsPath, 'utf8');
 
   const editable: Record<string, string> = {};
-  walkAndCollect(exDir, exDir, editable, lang);
+  const hidden: Record<string, string> = {};
+  walkAndCollect(exDir, exDir, editable, hidden, lang);
   if (Object.keys(editable).length === 0) return null;
 
   return {
@@ -171,6 +172,7 @@ function readExercise(
     language: lang,
     problemStatement,
     editableFiles: editable,
+    ...(Object.keys(hidden).length > 0 && { hiddenTests: hidden }),
   };
 }
 
@@ -188,7 +190,8 @@ const SKIP_DIR_PATTERNS = [/^\.docs$/, /^\.meta$/, /^node_modules$/, /^target$/,
 function walkAndCollect(
   baseDir: string,
   currentDir: string,
-  out: Record<string, string>,
+  editableOut: Record<string, string>,
+  hiddenOut: Record<string, string>,
   lang: PolyglotLanguage
 ): void {
   for (const entry of readdirSync(currentDir)) {
@@ -197,12 +200,16 @@ function walkAndCollect(
     const stat = statSync(entryPath);
     if (stat.isDirectory()) {
       if (SKIP_DIR_PATTERNS.some((p) => p.test(entry))) continue;
-      walkAndCollect(baseDir, entryPath, out, lang);
+      walkAndCollect(baseDir, entryPath, editableOut, hiddenOut, lang);
       continue;
     }
     if (entry === 'instructions.md') continue;
     const isTest = TEST_FILE_PATTERNS_BY_LANG[lang].some((p) => p.test(rel));
-    if (isTest) continue;
-    out[rel] = readFileSync(entryPath, 'utf8');
+    const content = readFileSync(entryPath, 'utf8');
+    if (isTest) {
+      hiddenOut[rel] = content;
+    } else {
+      editableOut[rel] = content;
+    }
   }
 }

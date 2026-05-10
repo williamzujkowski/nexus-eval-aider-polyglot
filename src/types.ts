@@ -35,6 +35,23 @@ export interface AiderInstance {
   readonly problemStatement: string;
   readonly editableFiles: Readonly<Record<string, string>>;
   readonly contextFiles?: Readonly<Record<string, string>>;
+  /**
+   * v0.2: per-language hidden test files bundled with the exercise.
+   * The model is NOT shown these in the prompt — they're materialised
+   * to disk alongside the model's edits at evaluation time and run by
+   * the language-specific toolchain (pytest / go test / cargo test /
+   * vitest / ctest).
+   *
+   * Keys are paths relative to the exercise root (e.g.
+   * `tests/test_solve.py`, `solve_test.go`). Values are the full file
+   * contents.
+   *
+   * Optional because pre-v0.2 fixtures (the bundled six-language smoke
+   * set) don't ship hidden tests — they're synthetic exercises whose
+   * pass/fail is "did the model emit any non-empty edits". GitHub-
+   * fetched and local-path-loaded exercises populate this field.
+   */
+  readonly hiddenTests?: Readonly<Record<string, string>>;
 }
 
 /**

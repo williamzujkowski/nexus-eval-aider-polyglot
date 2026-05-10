@@ -129,7 +129,10 @@ async function fetchLanguage(
   const tree = await fetchTreeWithRetry(treeUrl, fetchImpl);
   const exerciseRootPrefix = `${benchPath}/${lang}/exercises/`;
 
-  // Collect entries grouped by exercise dir.
+  // Collect entries grouped by exercise dir. We keep test files (so they
+  // can be materialised at evaluation time) but flag them via the
+  // synthesised `isTest` field so the editable/hiddenTests split is
+  // explicit at materialisation.
   const byExercise = new Map<string, GitHubTreeEntry[]>();
   for (const entry of tree.tree) {
     if (entry.type !== 'blob') continue;
@@ -139,9 +142,10 @@ async function fetchLanguage(
     if (slash === -1) continue; // expect <exercise>/<file>
     const exerciseName = rest.slice(0, slash);
     const fileRelPath = rest.slice(slash + 1);
-    if (shouldSkip(fileRelPath, lang)) continue;
+    if (shouldSkipEntirely(fileRelPath)) continue;
+    const isTest = isTestFile(fileRelPath, lang);
     const list = byExercise.get(exerciseName) ?? [];
-    list.push({ ...entry, exerciseRelPath: fileRelPath });
+    list.push({ ...entry, exerciseRelPath: fileRelPath, isTest });
     byExercise.set(exerciseName, list);
   }
 
@@ -172,6 +176,8 @@ interface GitHubTreeEntry {
   readonly sha: string;
   // Synthesised: relative path within the exercise dir.
   readonly exerciseRelPath?: string;
+  // Synthesised: did the per-language test pattern match this path?
+  readonly isTest?: boolean;
 }
 
 interface GitHubTreeResponse {
@@ -225,8 +231,8 @@ async function fetchExercise(
 ): Promise<AiderInstance | null> {
   const instructionsEntry = entries.find((e) => e.exerciseRelPath === 'instructions.md');
   if (instructionsEntry === undefined) return null;
-  const editableEntries = entries.filter((e) => e.exerciseRelPath !== 'instructions.md');
-  if (editableEntries.length === 0) return null;
+  const otherEntries = entries.filter((e) => e.exerciseRelPath !== 'instructions.md');
+  if (otherEntries.length === 0) return null;
 
   const problemStatement = await fetchRawFile(
     repo,
@@ -235,17 +241,25 @@ async function fetchExercise(
     fetchImpl
   );
   const editable: Record<string, string> = {};
-  for (const e of editableEntries) {
+  const hidden: Record<string, string> = {};
+  for (const e of otherEntries) {
     if (e.exerciseRelPath === undefined) continue;
     const fullPath = `${exerciseRootPrefix}${exerciseName}/${e.exerciseRelPath}`;
-    editable[e.exerciseRelPath] = await fetchRawFile(repo, ref, fullPath, fetchImpl);
+    const content = await fetchRawFile(repo, ref, fullPath, fetchImpl);
+    if (e.isTest === true) {
+      hidden[e.exerciseRelPath] = content;
+    } else {
+      editable[e.exerciseRelPath] = content;
+    }
   }
+  if (Object.keys(editable).length === 0) return null;
 
   return {
     instanceId: `${lang}/${exerciseName}`,
     language: lang,
     problemStatement,
     editableFiles: editable,
+    ...(Object.keys(hidden).length > 0 && { hiddenTests: hidden }),
   };
 }
 
@@ -266,12 +280,25 @@ async function fetchRawFile(
   return res.text();
 }
 
-function shouldSkip(relPath: string, lang: PolyglotLanguage): boolean {
-  if (relPath === 'instructions.md') return false; // captured separately
+/**
+ * Drop entries that aren't part of the exercise at all — build artifacts,
+ * editor state, etc. This is distinct from `isTestFile`, which keeps the
+ * file but routes it to `hiddenTests` instead of `editableFiles`.
+ */
+function shouldSkipEntirely(relPath: string): boolean {
   for (const dirPattern of SKIP_DIR_PATTERNS) {
     const firstSegment = relPath.split('/')[0] ?? '';
     if (dirPattern.test(firstSegment)) return true;
   }
+  return false;
+}
+
+/**
+ * Is this file a test file under the language's convention? Tests are
+ * captured in `hiddenTests` (used at evaluation time), NOT shown to the
+ * model, NOT in `editableFiles`.
+ */
+function isTestFile(relPath: string, lang: PolyglotLanguage): boolean {
   for (const testPattern of TEST_FILE_PATTERNS_BY_LANG[lang]) {
     if (testPattern.test(relPath)) return true;
   }
