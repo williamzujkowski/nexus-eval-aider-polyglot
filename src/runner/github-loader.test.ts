@@ -87,7 +87,7 @@ describe('loadFromGithub', () => {
     expect(instances[0]?.editableFiles['solution.py']).toContain('def solve()');
   });
 
-  it('filters out test files at fetch time (per-language regex)', async () => {
+  it('routes test files to hiddenTests, source to editableFiles', async () => {
     const fetchMock = makeFetchMock({
       'api.github.com': makeTreeResponse([
         {
@@ -113,6 +113,8 @@ describe('loadFromGithub', () => {
       ]),
       'instructions.md': makeRawResponse('Q'),
       'solution.py': makeRawResponse('S'),
+      'test_foo.py': makeRawResponse('T1'),
+      'foo_test.py': makeRawResponse('T2'),
     });
     const instances = await loadFromGithub({
       cacheDir,
@@ -120,6 +122,10 @@ describe('loadFromGithub', () => {
       fetchImpl: fetchMock,
     });
     expect(Object.keys(instances[0]?.editableFiles ?? {})).toEqual(['solution.py']);
+    expect(Object.keys(instances[0]?.hiddenTests ?? {}).sort()).toEqual([
+      'foo_test.py',
+      'test_foo.py',
+    ]);
   });
 
   it('caches the per-language index — second call does not refetch', async () => {
@@ -182,7 +188,7 @@ describe('loadFromGithub', () => {
     ).rejects.toThrow(/GitHub Trees API failed: 403.*GITHUB_TOKEN/s);
   });
 
-  it('skips entries under SKIP_DIR_PATTERNS (.docs, node_modules, target)', async () => {
+  it('skips SKIP_DIR_PATTERNS entirely + routes tests/ to hiddenTests', async () => {
     const fetchMock = makeFetchMock({
       'api.github.com': makeTreeResponse([
         {
@@ -208,6 +214,7 @@ describe('loadFromGithub', () => {
       ]),
       'instructions.md': makeRawResponse('Q'),
       'lib.rs': makeRawResponse('R'),
+      'tests/it.rs': makeRawResponse('IT'),
     });
     const instances = await loadFromGithub({
       cacheDir,
@@ -216,6 +223,57 @@ describe('loadFromGithub', () => {
     });
     const editableKeys = Object.keys(instances[0]?.editableFiles ?? {});
     expect(editableKeys).toEqual(['src/lib.rs']);
+    expect(Object.keys(instances[0]?.hiddenTests ?? {})).toEqual(['tests/it.rs']);
+  });
+
+  it('omits hiddenTests when the exercise has no test files', async () => {
+    const fetchMock = makeFetchMock({
+      'api.github.com': makeTreeResponse([
+        {
+          path: 'benchmark/exercises/python/exercises/notest/instructions.md',
+          type: 'blob',
+          sha: 'a',
+        },
+        {
+          path: 'benchmark/exercises/python/exercises/notest/sol.py',
+          type: 'blob',
+          sha: 'b',
+        },
+      ]),
+      'instructions.md': makeRawResponse('Q'),
+      'sol.py': makeRawResponse('S'),
+    });
+    const instances = await loadFromGithub({
+      cacheDir,
+      languages: ['python'],
+      fetchImpl: fetchMock,
+    });
+    expect(instances[0]?.hiddenTests).toBeUndefined();
+  });
+
+  it('drops exercises that have only test files (no editable source)', async () => {
+    const fetchMock = makeFetchMock({
+      'api.github.com': makeTreeResponse([
+        {
+          path: 'benchmark/exercises/python/exercises/onlytest/instructions.md',
+          type: 'blob',
+          sha: 'a',
+        },
+        {
+          path: 'benchmark/exercises/python/exercises/onlytest/test_only.py',
+          type: 'blob',
+          sha: 'b',
+        },
+      ]),
+      'instructions.md': makeRawResponse('Q'),
+      'test_only.py': makeRawResponse('T'),
+    });
+    const instances = await loadFromGithub({
+      cacheDir,
+      languages: ['python'],
+      fetchImpl: fetchMock,
+    });
+    expect(instances).toHaveLength(0);
   });
 
   it('writes the cache file in JSON form for the next run to read', async () => {
