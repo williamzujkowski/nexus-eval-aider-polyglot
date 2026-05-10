@@ -15,6 +15,8 @@ export type {
 
 // Lower-level building blocks for piecemeal consumption.
 export { loadAiderInstances } from './runner/instance-loader.js';
+export { loadFromGithub, DEFAULT_AIDER_REF } from './runner/github-loader.js';
+export type { LoadFromGithubOptions } from './runner/github-loader.js';
 export { generatePrediction } from './runner/agent-invoker.js';
 export type { GeneratePredictionOptions } from './runner/agent-invoker.js';
 export { extractEditedFiles } from './runner/file-extractor.js';

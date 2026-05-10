@@ -39,11 +39,15 @@ Usage:
 Options:
   --model-id <id>             Model identifier passed to the OpenAI-compat
                               endpoint. Default: env MODEL_ID or 'gpt-4o'.
-  --source <fixture|github|path>
+  --source <fixture|github|github:<ref>|path>
                               Where to load exercises from. Default: fixture.
                               'fixture' loads the bundled six-language smoke
-                              set; <path> points at an Aider-AI/aider checkout's
-                              benchmark/exercises directory.
+                              set; 'github' fetches from Aider-AI/aider main
+                              with on-disk cache (set GITHUB_TOKEN if you
+                              hit anonymous rate limits); 'github:<ref>'
+                              pins a branch / tag / commit SHA; <path> points
+                              at a local Aider-AI/aider/benchmark/exercises
+                              checkout.
   --languages <comma-list>    Filter by language (python,javascript,
                               typescript,go,rust,cpp). Default: all.
   --limit <n>                 Limit instances. Default: all.
@@ -86,7 +90,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (args.includes('--version') || args.includes('-v')) {
-    process.stdout.write('nexus-eval-aider-polyglot 0.1.0\n');
+    process.stdout.write('nexus-eval-aider-polyglot 0.2.0\n');
     return 0;
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "nexus-eval-aider-polyglot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Aider polyglot evaluation harness for nexus-agents — multi-language code-edit benchmark across 6 languages (Python, JavaScript, TypeScript, Go, Rust, C++)",
   "type": "module",
   "main": "dist/index.js",

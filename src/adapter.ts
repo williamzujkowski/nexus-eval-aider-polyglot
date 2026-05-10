@@ -52,12 +52,10 @@ export class AiderPolyglotAdapter
   }
 
   loadInstances(_runConfig: Record<string, unknown>): Promise<readonly AiderInstance[]> {
-    return Promise.resolve(
-      loadAiderInstances({
-        ...(this.config.source !== undefined && { source: this.config.source }),
-        ...(this.config.languages !== undefined && { languages: this.config.languages }),
-      })
-    );
+    return loadAiderInstances({
+      ...(this.config.source !== undefined && { source: this.config.source }),
+      ...(this.config.languages !== undefined && { languages: this.config.languages }),
+    });
   }
 
   async runInstance(

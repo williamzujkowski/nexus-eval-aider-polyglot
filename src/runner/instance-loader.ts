@@ -18,6 +18,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import type { AiderInstance, PolyglotLanguage } from '../types.js';
+import { loadFromGithub, type LoadFromGithubOptions } from './github-loader.js';
 
 const FIXTURE_LANGUAGES: readonly PolyglotLanguage[] = [
   'python',
@@ -58,27 +59,34 @@ const FIXTURE_FILE_BY_LANGUAGE: Record<PolyglotLanguage, { path: string; starter
 /**
  * Load Aider polyglot exercises.
  *
- * @param source - 'fixture' (default), 'github' (v0.2 — not yet
- *   implemented), or an absolute path to an Aider-AI/aider checkout's
- *   `benchmark/exercises/` directory
+ * @param source - 'fixture' (default), 'github' (v0.2 — fetches from
+ *   `Aider-AI/aider/benchmark/exercises/` via the GitHub Trees API +
+ *   raw.githubusercontent.com, with on-disk caching), 'github:<ref>'
+ *   to pin a specific branch / tag / commit SHA, or an absolute path
+ *   to an Aider-AI/aider checkout's `benchmark/exercises/` directory
  * @param languages - optional filter
  * @param maxInstances - optional cap
+ * @param githubOptions - reserved for tests / power users to inject a
+ *   `fetchImpl` mock or override the default cache dir
  */
-export function loadAiderInstances(args: {
+export async function loadAiderInstances(args: {
   readonly source?: 'fixture' | 'github' | string;
   readonly languages?: ReadonlyArray<PolyglotLanguage>;
   readonly maxInstances?: number;
-}): readonly AiderInstance[] {
+  readonly githubOptions?: LoadFromGithubOptions;
+}): Promise<readonly AiderInstance[]> {
   const source = args.source ?? 'fixture';
 
   let all: readonly AiderInstance[];
   if (source === 'fixture') {
     all = loadBundledFixture();
-  } else if (source === 'github') {
-    throw new Error(
-      'GitHub-fetch source is not yet implemented (v0.2 follow-up). ' +
-        'Use --source <path> to point at a local Aider-AI/aider/benchmark/exercises checkout.'
-    );
+  } else if (source === 'github' || source.startsWith('github:')) {
+    const ref = source.startsWith('github:') ? source.slice('github:'.length) : undefined;
+    all = await loadFromGithub({
+      ...(args.githubOptions ?? {}),
+      ...(ref !== undefined && ref !== '' && { ref }),
+      ...(args.languages !== undefined && { languages: args.languages }),
+    });
   } else {
     all = loadFromDirectory(source);
   }
