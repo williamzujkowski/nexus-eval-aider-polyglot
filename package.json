@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "nexus-agents": "^2.33.1",
+    "nexus-agents": "^2.71.0",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
   }
