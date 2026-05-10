@@ -2,7 +2,7 @@
 
 Aider polyglot evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
-> **Status**: v0.1 model-only baseline. Bundled six-language smoke fixture, prompt template, fenced-block file extractor, and IModelAdapter-driven runner all wired up. GitHub-fetch loader is the v0.2 follow-up; per-language test execution (true pass/fail) is the v0.3 follow-up.
+> **Status**: v0.2 — real test-based pass/fail. GitHub-fetch loader pulls from `Aider-AI/aider` with on-disk cache; per-language sandboxed test runner (pytest / npm test / go test / cargo test / make test) drives the verdict. Set `runTests: false` (or pass `--no-run-tests`) to fall back to the v0.1 "did the model produce edits" pass/fail. v0.3 will add multi-turn agentic flow via `ICliAdapter`.
 
 ## Why Aider polyglot
 
@@ -33,14 +33,27 @@ export OPENAI_API_KEY=sk-...
 export OPENAI_BASE_URL=https://your-gateway/v1   # optional
 export MODEL_ID=anthropic/claude-sonnet-4-6      # optional
 
-# Smoke test against the bundled six-language fixture (no network)
+# Smoke test against the bundled six-language fixture (no network, no
+# language toolchains needed — fixture has no hidden tests).
 npx nexus-eval-aider-polyglot --source fixture
+
+# Real run against the upstream Aider-AI/aider main branch (v0.2:
+# fetches via GitHub Trees API, caches to ~/.nexus-eval-aider-polyglot/).
+# Requires the language toolchains (pytest / npm / go / cargo / make)
+# in PATH for true test-based pass/fail.
+npx nexus-eval-aider-polyglot --source github --limit 10
+
+# Pin a specific upstream commit / tag for reproducibility
+npx nexus-eval-aider-polyglot --source github:abc1234 --limit 10
 
 # Run against a local Aider-AI/aider checkout
 npx nexus-eval-aider-polyglot --source /path/to/aider/benchmark/exercises --limit 10
 
 # Filter to Rust + Go only
-npx nexus-eval-aider-polyglot --source fixture --languages rust,go
+npx nexus-eval-aider-polyglot --source github --languages rust,go --limit 5
+
+# Skip the test runner (fast smoke without language toolchains installed)
+npx nexus-eval-aider-polyglot --source github --no-run-tests --limit 5
 
 # JSON summary for piping
 npx nexus-eval-aider-polyglot --json --source fixture > run.json
@@ -75,27 +88,44 @@ for (const [lang, stats] of Object.entries(meta.byLanguage)) {
 
 Operators with their own `IModelAdapter` (Claude API, Ollama, anything implementing the contract) can substitute it for `createOpenAIAdapter` without changing anything else.
 
-## What v0.1 actually does
+## What v0.2 actually does
 
-- Loads exercises from the bundled six-language fixture, or by walking a local Aider-AI/aider `benchmark/exercises/<lang>/exercises/` directory.
-- Composes a whole-file edit prompt that lists each editable file's current content and asks the model to emit fenced ``` ```<lang> path=X``` ``` blocks containing the updated content.
-- Filters out test files at load time so the model never sees the hidden tests.
-- Parses the response into a `path → content` map, dropping any path the instance didn't declare editable.
-- Reports pass/fail = "did the model produce ≥1 non-empty parsable edit", with a per-language breakdown.
+**Loader (3 sources):**
 
-## What v0.1 does NOT do
+- `--source fixture` — bundled six-language smoke set (~3 KB), no network
+- `--source github[:<ref>]` — pulls exercises from `Aider-AI/aider` via the GitHub Trees API + `raw.githubusercontent.com`. Caches to `~/.nexus-eval-aider-polyglot/cache/<repo>/<ref>/<lang>.index.json` (second run skips network entirely). `<ref>` pins a branch / tag / commit SHA for reproducibility. Set `GITHUB_TOKEN` env var if you hit the 60/hr anonymous rate limit
+- `--source <local-path>` — walks a local `Aider-AI/aider/benchmark/exercises/` checkout
 
-- Run the language-specific test suite (Python `pytest`, Go `go test`, etc.) against the emitted edits. Pass/fail in v0.1 is "edit produced", not "edit passes tests".
-- Fetch exercises directly from `Aider-AI/aider` on GitHub (use `--source <local-path>` for now).
-- Drive multi-turn agentic flows. Single round-trip only.
+**Routing test files:** the loader splits each exercise's files into `editableFiles` (shown to the model) and `hiddenTests` (not shown — used only at evaluation time). Per-language patterns: `_test.py` / `test_*.py` for Python, `*_test.go` for Go, `tests/` for Rust, `_test.cpp` / `tests/` for C++, `.test.js` / `.spec.js` / `.test.ts` / `.spec.ts` for JS/TS.
+
+**Prompt:** whole-file edit format. Model emits fenced ``` ```<lang> path=<relative-path>``` ``` blocks. Hallucinated paths (not in `editableFiles`) are dropped at parse time.
+
+**Evaluation (v0.2 default):** materialises the editable files + the model's edits + the hidden tests into a tmpdir, then spawns the language toolchain:
+
+| Language   | Toolchain                                |
+| ---------- | ---------------------------------------- |
+| python     | `pytest -q --no-header -x`               |
+| javascript | `npm test --silent`                      |
+| typescript | `npm test --silent`                      |
+| go         | `go test ./...`                          |
+| rust       | `cargo test --quiet -- --test-threads=1` |
+| cpp        | `make test`                              |
+
+Pass = exit 0 within timeout. Sandboxing: tmpdir, `spawn` (no shell), 60s default per-instance timeout via `setTimeout` + `SIGKILL`, env scrubbed of secrets (`OPENAI_*`, `NEXUS_*`, `GITHUB_TOKEN`, `NPM_TOKEN`, `AWS_*`, ...), output capped at 4 KB per stream, refuses paths with parent-directory traversal.
+
+Per-language pass-rate breakdown surfaces in the summary metadata.
+
+## What v0.2 does NOT do
+
+- Multi-turn agentic flows — model sees a static prompt, emits edits, harness evaluates. v0.3 will plug `ICliAdapter` in for iterate-on-test-failures.
+- Per-language Docker sandbox — current process-level sandboxing assumes vetted Aider-AI/aider exercises. Per-language Docker would be the next escalation if the threat model expands.
 
 ## Roadmap
 
-| Issue | Scope                                                                                                 |
-| ----- | ----------------------------------------------------------------------------------------------------- |
-| TBD   | **v0.2 — GitHub-fetch loader**. Pull exercises from `Aider-AI/aider` directly with on-disk caching.   |
-| TBD   | **v0.3 — Test-based pass/fail**. Run the per-language toolchain (pytest, vitest, go test, cargo test, ctest) against emitted edits. |
-| TBD   | **v0.3 — Agentic flow** via `ICliAdapter` so the model can iterate on test failures across multiple turns.  |
+| Issue | Scope                                                                                                          |
+| ----- | -------------------------------------------------------------------------------------------------------------- |
+| TBD   | **v0.3 — Multi-turn agentic flow** via `ICliAdapter` so the model can iterate on test failures across turns.   |
+| TBD   | **v0.3 — Docker per-language sandbox** if the threat model expands beyond vetted upstream exercises.            |
 
 Cross-repo tracking lives at [nexus-agents #2519](https://github.com/williamzujkowski/nexus-agents/issues/2519) (Tier 1 prioritisation pass).
 
