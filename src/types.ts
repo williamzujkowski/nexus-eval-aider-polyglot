@@ -94,6 +94,17 @@ export interface AiderEvalResult {
   readonly testStderr?: string;
   /** v0.2: true iff the language toolchain wasn't installed. */
   readonly toolchainMissing?: boolean;
+  /**
+   * v0.3: number of agent turns the model used in agentic mode.
+   * Undefined for v0.1/v0.2 single-shot runs.
+   */
+  readonly turnsUsed?: number;
+  /**
+   * v0.3: why the agent loop stopped — `agent-stopped` (model said
+   * done), `turn-budget`, `tool-error`, `cancelled`. Undefined for
+   * v0.1/v0.2 single-shot runs.
+   */
+  readonly agentStopReason?: string;
 }
 
 export interface AiderAdapterConfig {
@@ -123,4 +134,16 @@ export interface AiderAdapterConfig {
   readonly runTests?: boolean;
   /** v0.2: per-instance test timeout. Default: 60_000ms. */
   readonly testTimeoutMs?: number;
+  /**
+   * v0.3: drive the model as an agent that can iterate on test failures
+   * instead of single-shot edit-then-evaluate. Requires
+   * `nexus-agents >= 2.72.0` (the IAgenticAdapter primitive). When
+   * `true`, `runInstance` exposes `read_file` / `write_file` /
+   * `run_tests` tools to the model and lets it iterate; passing /
+   * failing is decided by the final test verdict, not the first edit.
+   * Default: `false` (v0.2 single-shot behaviour).
+   */
+  readonly agenticMode?: boolean;
+  /** v0.3: turn budget for agentic mode. Defaults to the model's profile recommendation. */
+  readonly agenticTurnBudget?: number;
 }

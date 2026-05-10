@@ -50,6 +50,14 @@ Options:
                               checkout.
   --languages <comma-list>    Filter by language (python,javascript,
                               typescript,go,rust,cpp). Default: all.
+  --agentic-mode              v0.3: drive the model as an agent that can
+                              iterate on test failures (read_file /
+                              write_file / run_tests tools). Requires
+                              nexus-agents >= 2.72.1. Default: false
+                              (single-shot v0.2 behaviour).
+  --agentic-turn-budget <n>   Max agent turns when --agentic-mode is on.
+                              Default: profile-derived (claude-opus = 20,
+                              gemini-flash = 8, default = 10).
   --limit <n>                 Limit instances. Default: all.
   --concurrency <n>           Max parallel solver calls. Default: 1.
   --timeout <ms>              Per-instance timeout. Default: 300000.
@@ -102,6 +110,8 @@ async function main(argv: readonly string[]): Promise<number> {
       languages: { type: 'string' },
       'no-run-tests': { type: 'boolean', default: false },
       'test-timeout': { type: 'string' },
+      'agentic-mode': { type: 'boolean', default: false },
+      'agentic-turn-budget': { type: 'string' },
       limit: { type: 'string' },
       concurrency: { type: 'string', default: '1' },
       timeout: { type: 'string', default: '300000' },
@@ -141,6 +151,10 @@ async function main(argv: readonly string[]): Promise<number> {
     ...(parsed.values['no-run-tests'] === true && { runTests: false }),
     ...(parsed.values['test-timeout'] !== undefined && {
       testTimeoutMs: Number(parsed.values['test-timeout']),
+    }),
+    ...(parsed.values['agentic-mode'] === true && { agenticMode: true }),
+    ...(parsed.values['agentic-turn-budget'] !== undefined && {
+      agenticTurnBudget: Number(parsed.values['agentic-turn-budget']),
     }),
   });
 
