@@ -42,5 +42,9 @@
     "nexus-agents": "^2.72.1",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nexus-substrate/nexus-eval-aider-polyglot.git"
   }
 }
