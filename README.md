@@ -1,6 +1,6 @@
 # nexus-eval-aider-polyglot
 
-Aider polyglot evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
+Aider polyglot evaluation harness for [nexus-agents](https://github.com/nexus-substrate/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
 > **Status**: v0.3 — multi-turn agentic flow. Opt in with `agenticMode: true` (or `--agentic-mode`); the model gets `read_file` / `write_file` / `run_tests` tools and iterates until tests pass or the turn budget hits. Built on the `IAgenticAdapter` primitive from nexus-agents 2.72.1. v0.2 single-shot mode remains the default — agentic mode is opt-in because it's slower + more expensive per instance.
 
@@ -15,7 +15,7 @@ What makes it useful alongside SWE-bench Pro:
 - **Edit format pressure**: the harness rewards models that emit clean whole-file edits to the *correct path*, not models that generate plausible code in the wrong place.
 - **Cheap to iterate**: useful for shaking out routing decisions, prompt regressions, and adapter bugs without burning a full Pro run.
 
-This repo follows the [nexus-agents harness-extraction policy](https://github.com/williamzujkowski/nexus-agents/issues/2514) (originally [#1960](https://github.com/williamzujkowski/nexus-agents/issues/1960)) — benchmarks live in standalone `nexus-eval-*` repos so they can evolve independently of the core.
+This repo follows the [nexus-agents harness-extraction policy](https://github.com/nexus-substrate/nexus-agents/issues/2514) (originally [#1960](https://github.com/nexus-substrate/nexus-agents/issues/1960)) — benchmarks live in standalone `nexus-eval-*` repos so they can evolve independently of the core.
 
 ## Install
 
@@ -127,7 +127,7 @@ Per-language pass-rate breakdown surfaces in the summary metadata.
 | TBD   | **v0.3 — Multi-turn agentic flow** via `ICliAdapter` so the model can iterate on test failures across turns.   |
 | TBD   | **v0.3 — Docker per-language sandbox** if the threat model expands beyond vetted upstream exercises.            |
 
-Cross-repo tracking lives at [nexus-agents #2519](https://github.com/williamzujkowski/nexus-agents/issues/2519) (Tier 1 prioritisation pass).
+Cross-repo tracking lives at [nexus-agents #2519](https://github.com/nexus-substrate/nexus-agents/issues/2519) (Tier 1 prioritisation pass).
 
 ## The contract
 
